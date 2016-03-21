@@ -1,16 +1,24 @@
 int switchState = 0;
 const int switchPin = 12;
 #include <Wire.h>
+#include "RTClib.h"
 
 long time = 0;
 long debounce = 200;
 
 String makeString(int);
 
+RTC_DS1307 rtc;
+
 void setup() {
-  Serial.begin(9600);
-  pinMode(switchPin, OUTPUT);
   Wire.begin();
+  Serial.begin(9600);
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    while(1);
+  }
+  pinMode(switchPin, OUTPUT);
+  rtc.adjust(DateTime(__DATE__, __TIME__));    // Adjust RTC to current time  
 
 /* ------ Set up Sensors ---------------------------------- */
 
@@ -23,10 +31,11 @@ Wire.endTransmission();
 }
 
 void loop() {
+  //DateTime now = rtc.now();
   long currentTime = 0;
   long prevTime = 0;
   long interval = 1000;
-  String intro = "Magnetometer, x, y, z, ";
+  String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\",";
   intro += '\n';
   String master = "";
   
@@ -53,7 +62,11 @@ void loop() {
 } 
 
 String makeString(int n) {
+  DateTime now = rtc.now();
   String sensorString = "";
+  sensorString = sensorString + "\"" + now.hour()   // Timestamp
+  +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
+  + millis() + "\",";
   
   switch (n) {
     case 1:   // Magnetometer
