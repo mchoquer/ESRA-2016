@@ -43,7 +43,7 @@ void loop() {
   long prevTime = 0;
   long interval = 1000;
   String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
-   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter";
+   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"";
   intro += '\n';
   String master = "";
   
@@ -56,12 +56,16 @@ void loop() {
     {
       currentTime = millis();
       if ( currentTime - prevTime >= interval) {
+        DateTime now = rtc.now();
         prevTime = currentTime;
         currentTime = millis();
-        for( int i = 1; i < 2; i++) { // Change '2' to number of sensors later
+        master = master + "\"" + now.hour()   // Timestamp
+          +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
+          + millis() + "\",";
+        for( int i = 1; i < 3; i++) { // Change '2' to number of sensors later
           master += makeString(i);
         } 
-        Serial.print(master); 
+        Serial.println(master); 
         master = "";      // Clear line of data
         
       }
@@ -70,11 +74,7 @@ void loop() {
 } 
 
 String makeString(int n) {
-  DateTime now = rtc.now();
   String sensorString = "";
-  sensorString = sensorString + "\"" + now.hour()   // Timestamp
-  +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
-  + millis() + "\",";
   
   switch (n) {
     case 1:   // Magnetometer
@@ -94,13 +94,17 @@ String makeString(int n) {
       
       sensorString = sensorString + '\"' + x + '\"' + ',';  // x-coordinate
       sensorString = sensorString + '\"' + y + '\"' + ',';  // y-coordinate
-      sensorString = sensorString + '\"' + z + '\"' + ',' + '\n'; // z-coordinate
+      sensorString = sensorString + '\"' + z + '\"' + ','; // z-coordinate
       break;
       
     case 2:   // BMP tempeture, pressure, altitude
-      Serial.print(bmp.readTemperature());
-      Serial.print(bmp.readPressure());
-      Serial.print(bmp.readPressure());
+     {
+      sensorString = sensorString +'\"' + bmp.readTemperature() + '\"' + ','; //Temp
+      sensorString = sensorString + '\"' + bmp.readPressure() + '\"' + ','; // Pressure
+      sensorString = sensorString + '\"' + bmp.readAltitude() + '\"' + ','; //Altitude
+      delay(200);
+     }
+      break;
       
    
     
@@ -108,7 +112,7 @@ String makeString(int n) {
       return "Error";
       break; 
     }
-    
+ 
     return sensorString;
 }
 
