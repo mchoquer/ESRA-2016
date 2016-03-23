@@ -48,8 +48,12 @@ void loop() {
     {
       currentTime = millis();
       if ( currentTime - prevTime >= interval) {
+        DateTime now = rtc.now();
         prevTime = currentTime;
         currentTime = millis();
+        master = master + "\"" + now.hour()   // Timestamp
+          +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
+          + millis() + "\",";
         for( int i = 1; i < 2; i++) { // Change '2' to number of sensors later
           master += makeString(i);
         } 
@@ -62,12 +66,7 @@ void loop() {
 } 
 
 String makeString(int n) {
-  DateTime now = rtc.now();
   String sensorString = "";
-  sensorString = sensorString + "\"" + now.hour()   // Timestamp
-  +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
-  + millis() + "\",";
-  
   switch (n) {
     case 1:   // Magnetometer
       int x, y, z;
