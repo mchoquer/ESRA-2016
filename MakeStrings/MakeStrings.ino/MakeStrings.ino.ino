@@ -2,6 +2,8 @@ int switchState = 0;
 const int switchPin = 12;
 #include <Wire.h>
 #include "RTClib.h"
+#include <util/delay.h>            //inc bmp
+#include "Adafruit_BMP085.h"
 
 long time = 0;
 long debounce = 200;
@@ -9,10 +11,13 @@ long debounce = 200;
 String makeString(int);
 
 RTC_DS1307 rtc;
+Adafruit_BMP085 bmp;
 
 void setup() {
   Wire.begin();
-  Serial.begin(9600);
+  Serial.begin(9600); 
+  bmp.begin();        // init bmp
+  
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
     while(1);
@@ -28,6 +33,8 @@ Wire.write(0x02);               // Select mode register
 Wire.write(0x00);               // Continuous measurement mode
 Wire.endTransmission();
 
+//temp
+
 }
 
 void loop() {
@@ -35,7 +42,8 @@ void loop() {
   long currentTime = 0;
   long prevTime = 0;
   long interval = 1000;
-  String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\",";
+  String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
+   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter";
   intro += '\n';
   String master = "";
   
@@ -81,12 +89,20 @@ String makeString(int n) {
         z = Wire.read()<<8;
         z |= Wire.read();
         y = Wire.read()<<8;
-        y |= Wire.read();
+        y |= Wire.read();  
       }
+      
       sensorString = sensorString + '\"' + x + '\"' + ',';  // x-coordinate
       sensorString = sensorString + '\"' + y + '\"' + ',';  // y-coordinate
       sensorString = sensorString + '\"' + z + '\"' + ',' + '\n'; // z-coordinate
       break;
+      
+    case 2:   // BMP tempeture, pressure, altitude
+      Serial.print(bmp.readTemperature());
+      Serial.print(bmp.readPressure());
+      Serial.print(bmp.readPressure());
+      
+   
     
     default: 
       return "Error";
