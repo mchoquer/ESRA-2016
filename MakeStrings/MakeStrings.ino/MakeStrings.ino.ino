@@ -8,15 +8,12 @@ int switchState = 0;
 int count = 0;
 long time = 0;
 long debounce = 200;
-long logInterval = 1000;  // mills between entries
-long syncInterval = 1000; // mills between calls to flush() - to write data to card
-// Look at SDExampleCode file for more info on how often to write data 
-unsigned long syncTime = 0;   // Time of last sync()
+long logInterval = 100; 
 
 const int switchPin = 12;     // Switch to ignition charge
 const int chipSelect = 10;    // CS line for SD card
-const int greenLEDpin = 3;
-const int redLEDpin = 2;
+const int greenLEDpin = 2;
+const int redLEDpin = 3;
 
 void error(char *);
 String makeString(int);
@@ -79,10 +76,10 @@ bmp.begin();        // Initialize bmp
 /* ------- End -------------------------------------------- */
 
 // Print column names to csv file
-logfile.println("\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
-   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"");
-Serial.println("\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
-   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"");   // Echo to serial 
+logfile.println("HH, MM, SS, millis(), Magnetometer, x, y, z, "
+   "Temp_C, Pres_Pa, Alt_Meter");
+Serial.println("HH, MM, SS, millis(), Magnetometer, x, y, z, "
+   "Temp_C, Pres_Pa, Alt_Meter");   // Echo to serial 
 
 }
 
@@ -91,27 +88,21 @@ void loop() {
   int numSensors = 2;
   long currentTime = 0;
   long prevTime = 0;
-  long interval = 1000;
-  /* String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
-   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"";
-  intro += '\n'; */
   String master = "";
   
   switchState = digitalRead(switchPin);
   if( switchState == HIGH && millis() - time > debounce) 
-  { 
-    // Serial.print(intro); // Print column names of csv
-    
+  {     
     while (1) 
     {
       currentTime = millis();
-      if ( currentTime - prevTime >= interval) {
+      if ( currentTime - prevTime >= logInterval) {
         prevTime = currentTime;
         currentTime = millis();
         digitalWrite(greenLEDpin, HIGH);  // Starting recording
-        master = master + "\"" + now.hour()   // Timestamp
-          +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
-          + millis() + "\",";
+        master = master + now.hour()   // Timestamp
+          + ", " + now.minute() + ", " + now.second() + ", "
+          + millis() + ", ";
         for( int i = 0; i < numSensors; i++) { 
           master += makeString(i);
         } 
@@ -119,6 +110,7 @@ void loop() {
         Serial.println(master);         // Echo to serial 
         digitalWrite(greenLEDpin, LOW); // End recording
         count++;                        // Increment count for flush time
+        master = "";                    // Clear string of data
         
       }
       if (count >= 10) {    // Flush data to card
@@ -134,7 +126,8 @@ void loop() {
 void error(char *str) {
   Serial.print("Error: ");
   Serial.println(str);
-
+  // red LED for error
+  digitalWrite(redLEDpin, HIGH);
   while(1);
 }
 
@@ -148,24 +141,23 @@ String makeString(int n) {
       Wire.endTransmission();
       Wire.requestFrom(0x1E, 6);
       if(6 <= Wire.available()) {
-        x = Wire.read()<<8; // x msb
-        x |= Wire.read();   // x lsb
-        z = Wire.read()<<8;
-        z |= Wire.read();
-        y = Wire.read()<<8;
-        y |= Wire.read();  
+        x = Wire.read()<<8; // x most significant bit
+        x |= Wire.read();   // x least significant bit
+        z = Wire.read()<<8; // z msb
+        z |= Wire.read();   // z lsb
+        y = Wire.read()<<8; // y msb
+        y |= Wire.read();   // y lsb 
       }
       
-      sensorString = sensorString + '\"' + x + '\"' + ',';  // x-coordinate
-      sensorString = sensorString + '\"' + y + '\"' + ',';  // y-coordinate
-      sensorString = sensorString + '\"' + z + '\"' + ','; // z-coordinate
+      sensorString = sensorString + x + ", ";  // x-coordinate
+      sensorString = sensorString + y + ", ";  // y-coordinate
+      sensorString = sensorString + z + ", ";  // z-coordinate
       break;
       
-    case 1:   // BMP tempeture, pressure, altitude
-      sensorString = sensorString +'\"' + bmp.readTemperature() + '\"' + ','; //Temp
-      sensorString = sensorString + '\"' + bmp.readPressure() + '\"' + ','; // Pressure
-      sensorString = sensorString + '\"' + bmp.readAltitude() + '\"' + ','; //Altitude
-      delay(200);
+    case 1:                           // BMP temperature, pressure, altitude
+      sensorString = sensorString + bmp.readTemperature() + ", "; // Temp
+      sensorString = sensorString + bmp.readPressure() + ", ";    // Pressure
+      sensorString = sensorString + bmp.readAltitude() + ", ";    // Altitude
       break;
 
     default: 
