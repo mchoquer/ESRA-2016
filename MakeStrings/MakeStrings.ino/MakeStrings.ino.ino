@@ -1,25 +1,65 @@
-int switchState = 0;
-const int switchPin = 12;
-#include <Wire.h>
-#include "RTClib.h"
-#include <util/delay.h>            //inc bmp
-#include "Adafruit_BMP085.h"
+#include <Wire.h>             // I2C
+#include "RTClib.h"           // RTC
+#include <SD.h>               // SD card
+#include <util/delay.h>       // Temp/Press/Alt Sensor             
+#include "Adafruit_BMP085.h"  // Temp/Press/Alt Sensor
 
+int switchState = 0;
+int count = 0;
 long time = 0;
 long debounce = 200;
+long logInterval = 1000;  // mills between entries
+long syncInterval = 1000; // mills between calls to flush() - to write data to card
+// Look at SDExampleCode file for more info on how often to write data 
+unsigned long syncTime = 0;   // Time of last sync()
 
+const int switchPin = 12;     // Switch to ignition charge
+const int chipSelect = 10;    // CS line for SD card
+const int greenLEDpin = 3;
+const int redLEDpin = 2;
+
+void error(char *);
 String makeString(int);
+File logfile;
 
 RTC_DS1307 rtc;
 Adafruit_BMP085 bmp;
 
 void setup() {
-  Wire.begin();
-  Serial.begin(9600); 
-  bmp.begin();        // init bmp
   
+  Serial.begin(9600); 
+  pinMode(switchPin, INPUT);
+  pinMode(chipSelect, OUTPUT);
+  pinMode(greenLEDpin, OUTPUT);
+  pinMode(redLEDpin, OUTPUT);
+  
+  // See if card is present and can be initialized:
+  if (!SD.begin(chipSelect)) 
+    error("Card failed, or not present");
+  Serial.println("card initialized.");
+
+  // Create a new file
+  char filename[] = "LOGGER00.CSV";
+  for (long i = 0; i < 100; i++) {
+    filename[6] = i/10 + '0';
+    filename[7] = i%10 + '0';
+    if (!SD.exists(filename)) {
+      // Only open a file that doesn't exist
+      logfile = SD.open(filename, FILE_WRITE);
+      break;    // Leave loop
+    }
+  }
+  if (! logfile) 
+    error("Couldn't create file");
+  Serial.print("Logging to: ");
+  Serial.print(filename);
+  
+  Wire.begin();  
+  
+  // Connect first to RTC 
   if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
+    error("Couldn't find RTC");
+    logfile.println("RTC failed");
     while(1);
   }
   pinMode(switchPin, OUTPUT);
@@ -27,11 +67,22 @@ void setup() {
 
 /* ------ Set up Sensors ---------------------------------- */
 
-//Magnetometer
+// Magnetometer
 Wire.beginTransmission(0x1E);   // Address of magnetometer 0x1E
 Wire.write(0x02);               // Select mode register
 Wire.write(0x00);               // Continuous measurement mode
 Wire.endTransmission();
+
+// Press/Temp/Alt Sensor
+bmp.begin();        // Initialize bmp
+
+/* ------- End -------------------------------------------- */
+
+// Print column names to csv file
+logfile.println("\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
+   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"");
+Serial.println("\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
+   "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"");   // Echo to serial 
 
 }
 
@@ -41,15 +92,15 @@ void loop() {
   long currentTime = 0;
   long prevTime = 0;
   long interval = 1000;
-  String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
+  /* String intro = "\"HH\",\"MM\",\"SS\",\"millis()\",\"Magnetometer\",\"x\",\"y\",\"z\","
    "\"Temp_C\",\"Pres_Pa\",\"Alt_Meter\"";
-  intro += '\n';
+  intro += '\n'; */
   String master = "";
   
   switchState = digitalRead(switchPin);
   if( switchState == HIGH && millis() - time > debounce) 
   { 
-    Serial.print(intro); // Print column names of csv
+    // Serial.print(intro); // Print column names of csv
     
     while (1) 
     {
@@ -57,19 +108,35 @@ void loop() {
       if ( currentTime - prevTime >= interval) {
         prevTime = currentTime;
         currentTime = millis();
+        digitalWrite(greenLEDpin, HIGH);  // Starting recording
         master = master + "\"" + now.hour()   // Timestamp
           +"\",\"" + now.minute() + "\",\"" + now.second() + "\",\""
           + millis() + "\",";
         for( int i = 0; i < numSensors; i++) { 
           master += makeString(i);
         } 
-        Serial.println(master); 
-        master = "";      // Clear line of data
+        logfile.println(master);  
+        Serial.println(master);         // Echo to serial 
+        digitalWrite(greenLEDpin, LOW); // End recording
+        count++;                        // Increment count for flush time
         
+      }
+      if (count >= 10) {    // Flush data to card
+        digitalWrite(redLEDpin, HIGH);
+        logfile.flush();
+        digitalWrite(redLEDpin, LOW);
+        count = 0;
       }
     }
   }
 } 
+
+void error(char *str) {
+  Serial.print("Error: ");
+  Serial.println(str);
+
+  while(1);
+}
 
 String makeString(int n) {
   String sensorString = "";
@@ -102,7 +169,7 @@ String makeString(int n) {
       break;
 
     default: 
-      return "Error";
+      return "Error: Problem with recording data in makeString()";
       break; 
     }
  
