@@ -12,8 +12,8 @@ long logInterval = 100;
 
 const int switchPin = 12;     // Switch to ignition charge
 const int chipSelect = 10;    // CS line for SD card
-const int greenLEDpin = 2;
-const int redLEDpin = 3;
+const int greenLEDpin = 4;
+const int redLEDpin = 5;
 
 void error(char *);
 String makeString(int);
