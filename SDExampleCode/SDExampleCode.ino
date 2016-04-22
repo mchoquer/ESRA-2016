@@ -114,7 +114,8 @@ void setup(void)
 
 void loop(void)
 {
-  DateTime now;
+  DateTime now = RTC.now();   // (MC) When sketch tried, time data didnt change; thinking this line
+  // should be "DateTime now = rtc.now();"
 
   // delay for the amount of time we want between readings
   delay((LOG_INTERVAL -1) - (millis() % LOG_INTERVAL));
